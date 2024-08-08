@@ -2666,7 +2666,7 @@ def measure_RV(dp,instrument='HARPS',star='solar',save_figure=True,air=True,air1
             self.ax[1].set_xlabel('Radial velocity (km/s)')
             self.ax[1].set_ylabel('Mean flux')
             legend=self.ax[1].legend(fontsize=6)
-            for lh in legend.legendHandles:
+            for lh in legend.legend_handles:
                 try:
                     lh._legmarker.set_alpha(1.0)
                 except:
