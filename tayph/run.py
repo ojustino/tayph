@@ -2939,11 +2939,11 @@ def measure_RV(dp,instrument='HARPS',star='solar',save_figure=True,air=True,air1
     plt.plot(callback.Lw)
     plt.show()
     pdb.set_trace()
-    sys.exit()
+    # sys.exit()
 
 
-    class advcorrector(object,c2d,cT2d):
-        def __init__(self):
+    class advcorrector(object):
+        def __init__(self,c2d,cT2d):
             if c2d and cT2d:
                 self.mode='both'
             elif c2d:

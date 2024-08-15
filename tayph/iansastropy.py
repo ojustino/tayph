@@ -98,7 +98,7 @@ def occultnonlin_small(z,p, cn):
     #import pdb
     import numpy as np
 
-    cn = np.array([cn], copy=False).ravel()
+    cn = np.asarray([cn]).ravel()
     if cn.size < 4:
         cn = np.concatenate((cn, [0.]*(4-cn.size)))
 
