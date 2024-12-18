@@ -773,7 +773,7 @@ def read_espresso4UT(inpath,filelist,read_s1d=True,skysub=True):
                         raise ValueError(f"in read_e2ds when reading ESPRESSO 4UT data. You do not seem to be using ESPRESSO's 4UT mode.")
                     else:
                     #Because ESO hates us, it doesn't give an average value, but just the info from all four UTs in the header
-                        
+
                         hdr1d['TELALT']     = np.mean(np.asarray([hdr1d[f'ESO TEL{t} ALT'] for t in tel_list]))
                         hdr1d['RHUM']       = np.mean(np.asarray([hdr1d[f'ESO TEL{t} AMBI RHUM'] for t in tel_list]))
                         hdr1d['PRESSURE']   = 0.5*(np.mean(np.array([hdr1d[f'ESO TEL{t} AMBI PRES START'] for t in tel_list]))+np.mean(np.array([hdr1d[f'ESO TEL{t} AMBI PRES START'] for t in tel_list])))
@@ -974,14 +974,14 @@ def read_spirou(inpath,filelist,read_s1d=False):
             for idx in range(__norders):
                 numberofNaN = np.count_nonzero(np.isnan(fluxdata[idx]))
                 idxfilter.append(numberofNaN != fluxdata[idx].size)
-#                __ratio = float(numberofNaN) / float(fluxdata[idx].size)
-#                idxfilter.append(__ratio < 1.0)
-#                print("numberofNaN"+str(numberofNaN)+"  fluxdata:"+str(fluxdata[idx].size)+"   ratio:"+str(__ratio))
+               # __ratio = float(numberofNaN) / float(fluxdata[idx].size)
+               # idxfilter.append(__ratio < 1.0)
+               # print("numberofNaN"+str(numberofNaN)+"  fluxdata:"+str(fluxdata[idx].size)+"   ratio:"+str(__ratio))
             fluxdata = fluxdata[idxfilter]
             wavedata = wavedata[idxfilter]
             blazedata = blazedata[idxfilter]
             teldata = teldata[idxfilter]
-#            print("dropped count of orders: "+str(np.size(idxfilter) - np.sum(idxfilter)))
+           # print("dropped count of orders: "+str(np.size(idxfilter) - np.sum(idxfilter)))
             __norders = __norders - np.size(idxfilter) + np.sum(idxfilter)  # subtracts number of False
 
             framename.append(filelist[i])
@@ -1035,7 +1035,7 @@ def read_gianob(inpath,filelist,read_s1d=True):
     wave=[]
 
     for i in range(len(filelist)):
-#        if filelist[i].endswith('AB_ms1d.fits'):
+       # if filelist[i].endswith('AB_ms1d.fits'):
         if filelist[i].endswith('_A_ms1d.fits') or filelist[i].endswith('_B_ms1d.fits'):
             hdul = fits.open(inpath/filelist[i])
             fitsdata = copy.deepcopy(hdul[1].data)
@@ -1069,9 +1069,9 @@ def read_gianob(inpath,filelist,read_s1d=True):
                     snrdata.append(fitsdata[idx][3])
                 wave.append(ops.vactoair(np.array(wavedata)))
                 e2ds.append(np.array(fluxdata))
-#                print("---wave then flux---")
-#                print(np.array(wavedata))
-#                print(np.array(fluxdata))
+               # print("---wave then flux---")
+               # print(np.array(wavedata))
+               # print(np.array(fluxdata))
 
                 if read_s1d:
                     s1d_path=inpath/Path(str(filelist[i]).replace('_ms1d.fits','_s1d.fits'))
@@ -1104,7 +1104,7 @@ def read_gianob(inpath,filelist,read_s1d=True):
                     s1dmjd=np.append(s1dmjd,hdr1d['MJD-OBS'])
                     hdr1d['TELALT'] = np.degrees(float(hdr1d['EL']))
                     hdr1d['UTC'] = (float(hdr1d['MJD-OBS']) % 1.0) * 86400.0
-#                    print("wave:"+str(len(wavedata1d))+" flux:"+str(len(fluxdata1d)))
+                   # print("wave:"+str(len(wavedata1d))+" flux:"+str(len(fluxdata1d)))
 
     if read_s1d:
         output = {'wave':wave,'e2ds':e2ds,'header':header,'wave1d':wave1d,'s1d':s1d,'s1dhdr':s1dhdr,
@@ -1456,7 +1456,7 @@ def read_crires(inpath,filelist,read_s1d=True,nod='both'):
 
 def read_hires_makee(inpath,filelist,construct_s1d=True,N_CCD=3):
     """
-    This reads a folder of HIRES data reduced by MIKEE. This is an experimental module based on one
+    This reads a folder of HIRES data reduced by MAKEE. This is an experimental module based on one
     set of transit observations, courtesy J. Teske.
 
     Assumptions:
@@ -1763,3 +1763,70 @@ def read_foces(inpath,filelist,mode,construct_s1d=True):
                   'norders': norders, 'berv': berv, 'airmass': airmass}
 
     return (output)
+
+
+def read_mike(inpath, filelist, construct_s1d=False):
+    """
+    Fetch and calculate needed values from MIKE FITS headers in the manner
+    expected by tayph.run's read_e2ds() function.
+
+    inpath : Path
+        The parent directory where the MIKE FITS files are locate.
+        (why not just either give a list of specific files or a parent directory?)
+    filelist : list of str/Path
+        The names of the MIKE FITS files to be read.
+    construct_s1d : bool, optional
+        Whether or not to construct a 1-D spectrum from the MIKE FITS data.
+        [default: False]
+
+    T0-D0: s1d, wave1d
+    """
+    from astropy.time import Time
+    from astropy.wcs import WCS
+    from collections import defaultdict
+    from tayph.system_parameters import calculateberv
+
+    output = defaultdict(list)
+
+    for i, ff in enumerate(filelist):
+        header = fits.getheader(inpath / ff)
+        data = fits.getdata(inpath / ff)
+
+        output['framename'].append(ff)
+        output['header'].append(header)
+        output['obstype'].append('SCIENCE')  # assuming this is always the case
+
+        output['texp'].append(np.float64(header['EXPTIME']))  # units not labeled in MIKE header; should be seconds
+        output['date'].append(header['DATE-OBS'])  # MIKE is less precise (whole seconds vs ms with HARPS-N)
+        output['mjd'].append(Time(header['DATE-OBS'], scale='utc').mjd)  # must convert from UTC since MIKE header lacks (M)JD keys
+
+        output['npx'].append(header['NAXIS1'])
+        output['norders'].append(header['NAXIS2'])
+
+        # calculate barycentric earth radial velocity ("berv")
+        # date, earth_coordinates (lat, lon, height in m), ra, dec, mode
+        berv = calculateberv(header['DATE-OBS'],
+                             [ header['SITELAT'], header['SITELONG'],
+                               header['SITEALT']],  # z coordinate is height in meters
+                             header['RA'], header['DEC'], mode='MIKE')
+        output['berv'].append(berv)
+
+        output['e2ds'].append(data[-1])  # only save the flux-corrected spectrum
+        output['airmass'].append(header['AIRMASS'])
+
+        # retrieve wavelength solution from series of "WAT2" keywords in header
+        output['wave'].append(ut.read_wave_from_mike_header(header))
+
+        if construct_s1d:
+            # create it?
+            output['s1d'].append(...)  # remember we think HARPS-N "EL" is MIKE "GRAT-EL"
+            output['s1dhdr'].append(header)
+            output['s1dmjd'].append(Time(header['DATE-OBS'], scale='utc').mjd)
+            output['wave1d'].append(...)
+
+    # convert needed elements to arrays
+    for k in output.keys():
+        if k in ['texp', 'mjd', 's1dmjd', 'npx', 'norders', 'airmass', 'berv']:
+            output[k] = np.array(output[k])
+
+    return output

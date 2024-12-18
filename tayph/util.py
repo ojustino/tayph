@@ -380,3 +380,72 @@ def read_wave_from_makee_header(h):
 
         wave[i] = np.poly1d(coeffs)(x)
     return(wave)
+
+
+def read_wave_from_mike_header(header):
+    """
+    A routine to process wave-related attributes in MIKE FITS headers and
+    calculate the wavelength solution.
+
+    (Partially adapted from Trevor Dorn-Wallenstein's extract_wav_flux()
+    function for processing MIKE FITS data.)
+
+    MIKE headers present these attributes as a series of strings with values for
+    each order's wavelength solution. However, due to FITS header constraints,
+    these attributes are sliced by number of characters instead of by order.
+    This function joins and then re-slices them by order, which allows WCS and
+    tayph to process them.
+
+    header : astropy.io.fits.header.Header
+        The header of the MIKE FITS file.
+    """
+    from astropy.wcs import WCS
+    import numpy as np
+    import re
+
+    MAX_HEADER_LEN = 68
+
+    # collect all attributes related to wavelength solution in a dict
+    wv_sln_keys = {k: v for k, v in header.items() if k.startswith('WAT')}
+
+    # ensure all WAT2 attributes are full length (68 characters) to avoid
+    # spacing issues with join
+    for k, v in wv_sln_keys.items():
+        if k.startswith('WAT2') and len(v) != MAX_HEADER_LEN:
+            wv_sln_keys[k] += ' ' * (MAX_HEADER_LEN - len(v))
+
+    # join all matching entries into one str for each "WAT" attribute
+    # (attributes are separated by their third index – WAT0, WAT1, WAT2)
+    wv_sln_inds = list(set([k[3] for k in wv_sln_keys.keys()]))
+    wv_sln_strs = {}
+    for n in wv_sln_inds:
+        wv_sln_strs[f"WAT{n}"] = ''.join([v for k, v in wv_sln_keys.items()
+                                          if k[3] == n])
+
+    # re-split "specN" values in joined WAT2 str by order
+    # (dict comprehension drops "wtype" info at beginning of string and strips
+    #  trailing quotation marks to avoid processing errors later on)
+    wat2_spec_vals = {f"spec{i}": v.split('"')[0] for i, v
+                      in enumerate(re.split('spec\d+ = "',
+                                            wv_sln_strs['WAT2'])[1:], 1)}
+
+    # split each specN value's string wavelength solution info into a list
+    wat2_spec_vals_split = {k: v.split() for k, v in wat2_spec_vals.items()}
+
+    # build 2-D array of wavelengths per order
+    wavs = []
+    for ws_vals in wat2_spec_vals_split.values():
+        ww = WCS(naxis=1)
+        ww.wcs.ctype=['LINEAR']
+        try:
+            ww.wcs.crval = [np.float64(ws_vals[3])]
+            ww.wcs.crpix = [0]
+            ww.wcs.cdelt = [np.float64(ws_vals[4])]
+            x = np.arange(int(np.float64(ws_vals[5])))
+            lam = ww.wcs_pix2world(x,1)[0]
+            wavs.append(lam)
+        except:
+            print(ws_vals)
+            raise
+
+    return wavs
